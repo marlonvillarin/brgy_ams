@@ -2,6 +2,7 @@
 session_start();
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
+
 requireLogin();
 
 $id = (int) ($_GET['id'] ?? 0);
@@ -296,13 +297,33 @@ $body_text = $body_texts[$a['document_type']] ?? "This is to certify that <stron
     <!-- Header -->
     <div class="ph">
       <div class="ph-logos">
-        <div class="logo-circle">🇵🇭</div>
+        <!-- LEFT: Barangay Maguikay Logo (replaces the PH flag) -->
+        <div class="logo-circle">
+          <?php
+          $logo_path = 'assets/images/brgy_maguikay_logo.png';
+          if (file_exists($_SERVER['DOCUMENT_ROOT'] . '/brgy_ams/assets/images/brgy_maguikay_logo.png')): ?>
+            <img src="<?= $logo_path ?>" alt="Barangay Maguikay Logo"
+              style="width: 60px; height: 60px; border-radius: 50%; object-fit: cover;">
+          <?php else: ?>
+            🏛️
+          <?php endif; ?>
+        </div>
+
         <div>
           <div class="ph-title">Republic of the Philippines</div>
           <div class="ph-brgy">Barangay Maguikay</div>
-          <div class="ph-loc">City / Municipality, Province</div>
+          <div class="ph-loc">Mandaue City, Cebu</div>
         </div>
-        <div class="logo-circle">🏛️</div>
+        <div class="logo-circle">
+          <?php
+          $bp_logo_path = 'assets/images/bagong_pilipinas_logo.png';
+          if (file_exists($_SERVER['DOCUMENT_ROOT'] . '/brgy_ams/assets/images/bagong_pilipinas_logo.png')): ?>
+            <img src="<?= $bp_logo_path ?>" alt="Bagong Pilipinas Logo"
+              style="width: 60px; height: 60px; border-radius: 50%; object-fit: cover;">
+          <?php else: ?>
+            🏛️
+          <?php endif; ?>
+        </div>
       </div>
     </div>
     <hr class="ph-line">
@@ -328,10 +349,36 @@ $body_text = $body_texts[$a['document_type']] ?? "This is to certify that <stron
       </div>
     </div>
 
-    <!-- Signature -->
-    <div class="sig-row">
-      <div class="sig-box">
-        <div class="seal">🏛️</div>
+    <!-- Signature: SEAL on LEFT, SIGNATURE on RIGHT -->
+    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 40px;">
+
+      <!-- LEFT SIDE: SEAL ONLY (with actual image) -->
+      <div style="text-align: center;">
+        <div class="seal">
+          <?php
+          $seal_path = 'assets/images/barangay_seal_black.png';
+          if (file_exists($_SERVER['DOCUMENT_ROOT'] . '/brgy_ams/assets/images/barangay_seal_black.png')): ?>
+            <img src="<?= $seal_path ?>" alt="Barangay Seal"
+              style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover;">
+          <?php else: ?>
+            🏛️
+          <?php endif; ?>
+        </div>
+      </div>
+
+      <!-- RIGHT SIDE: SIGNATURE + NAME (stays in original position) -->
+      <div style="text-align: center;">
+        <div style="margin: 15px 0 5px 0;">
+          <?php
+          $signature_path = 'assets/images/signature1.png';
+          if (file_exists($signature_path)): ?>
+            <img src="<?= $signature_path ?>" alt="Barangay Captain Signature"
+              style="width: 180px; height: auto; max-height: 60px;">
+          <?php else: ?>
+            <div style="height: 40px; border-bottom: 1px solid #000; width: 180px; margin: 0 auto;"></div>
+            <div style="font-size: 10px; color: #999; margin-top: 5px;">(Signature)</div>
+          <?php endif; ?>
+        </div>
         <div class="sig-name">HON. MARLON P. VILLARIN</div>
         <div class="sig-title">Punong Barangay</div>
       </div>

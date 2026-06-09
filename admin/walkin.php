@@ -35,6 +35,22 @@ function getSlotCount($conn, $date, $time)
     $stmt->execute();
     return $stmt->get_result()->fetch_assoc()['total'] ?? 0;
 }
+function validatePhone($phone)
+{
+    // Remove any spaces, dashes, or special characters
+    $phone = preg_replace('/[^0-9]/', '', $phone);
+
+    // Check if it's exactly 11 digits and starts with 09
+    if (strlen($phone) !== 11) {
+        return ['valid' => false, 'message' => 'Phone number must be exactly 11 digits.'];
+    }
+
+    if (!preg_match('/^09/', $phone)) {
+        return ['valid' => false, 'message' => 'Phone number must start with 09.'];
+    }
+
+    return ['valid' => true, 'message' => '', 'cleaned' => $phone];
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
@@ -60,7 +76,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $err = "Invalid date.";
     } else {
 
-        // 🔥 LIMIT CHECK (10 per slot)
+
         $count = getSlotCount($conn, $date, $time);
 
         if ($count >= 10) {
@@ -131,8 +147,12 @@ $page_title = "Walk-in Appointment — Admin";
 
             <div class="frow">
                 <div class="fg">
-                    <label class="flabel">Contact Number</label>
-                    <input type="text" name="phone" class="fc" value="<?= e($old['phone'] ?? '') ?>">
+                    <label class="flabel">Contact Number <span class="req">*</span></label>
+                    <input type="tel" name="phone" id="phone" class="fc" placeholder="09XXXXXXXXX"
+                        value="<?= e($old['phone'] ?? '') ?>" maxlength="11" pattern="09[0-9]{9}" required>
+                    <div class="fhint" style="color:#6c757d; font-size:11px;">
+                        📱 Must be 11 digits and start with 09 (e.g., 09123456789)
+                    </div>
                 </div>
 
                 <div class="fg">

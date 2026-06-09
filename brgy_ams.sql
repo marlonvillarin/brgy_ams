@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Apr 22, 2026 at 05:44 PM
+-- Generation Time: Jun 09, 2026 at 05:12 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -55,7 +55,10 @@ INSERT INTO `appointments` (`id`, `user_id`, `document_type`, `purpose`, `appt_d
 (10, 16, 'Barangay Indigency Certificate', 'Balay', '2026-04-22', '08:00 AM', 'asd', 'approved', NULL, '2026-04-22 15:27:29', '2026-04-22 13:05:51', NULL, NULL, NULL),
 (11, 16, 'Barangay Indigency Certificate', 'Balay', '2026-04-22', '10:00 AM', 'para sayu', 'approved', NULL, NULL, '2026-04-22 13:06:16', NULL, NULL, NULL),
 (12, NULL, 'Barangay Clearance', 'Employs', '2026-04-23', '02:00 PM', 'For job', 'approved', NULL, NULL, '2026-04-22 13:17:23', 'Nikko Peublas', '09123456789', 'Mactan'),
-(13, NULL, 'Barangay Indigency Certificate', '123', '2026-04-24', '08:00 AM', 'asd', 'approved', NULL, NULL, '2026-04-22 14:30:22', 'Diane', '09456321879', 'LLc');
+(13, NULL, 'Barangay Indigency Certificate', '123', '2026-04-24', '08:00 AM', 'asd', 'approved', NULL, NULL, '2026-04-22 14:30:22', 'Diane', '09456321879', 'LLc'),
+(14, 11, 'Barangay Business Clearance', 'employemen t', '2026-04-25', '11:00 AM', '', 'approved', 'Bring Valid ID', NULL, '2026-04-24 00:08:29', NULL, NULL, NULL),
+(15, NULL, 'Barangay Indigency Certificate', 'for Certificate', '2026-05-15', '08:00 AM', 'doing greate', 'approved', NULL, NULL, '2026-05-14 14:35:38', 'Nikko Peublas', '09213541232', 'Lapu Lapu City Cebu'),
+(16, 18, 'Barangay Business Clearance', 'for Certificate', '2026-05-16', '08:00 AM', '', 'approved', 'pagdaala ug kwarta', NULL, '2026-05-15 12:50:28', NULL, NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -77,18 +80,15 @@ CREATE TABLE `notifications` (
 --
 
 INSERT INTO `notifications` (`id`, `user_id`, `title`, `message`, `is_read`, `created_at`) VALUES
-(5, 11, 'Welcome to Barangay AMS!', 'Your account has been verified.', 1, '2026-04-22 06:03:15'),
-(6, 11, 'Appointment Submitted', 'Your appointment for Barangay Clearance on 2026-04-23 at 09:00 AM is now pending review.', 1, '2026-04-22 07:02:42'),
 (7, 6, 'New Appointment Request', 'Marlon Villarin has requested Barangay Clearance on 2026-04-23.', 1, '2026-04-22 07:02:42'),
-(8, 11, 'Appointment Submitted', 'Your appointment for Barangay Certificate of Residency on 2026-04-24 at 10:00 AM is now pending review.', 1, '2026-04-22 07:03:01'),
 (9, 6, 'New Appointment Request', 'Marlon Villarin has requested Barangay Certificate of Residency on 2026-04-24.', 1, '2026-04-22 07:03:01'),
-(10, 11, 'Appointment Approved', 'Your appointment for Barangay Clearance on 2026-04-23 has been approved. Note: Bring', 1, '2026-04-22 07:04:23'),
-(11, 11, 'Appointment Approved', 'Your appointment for Barangay Certificate of Residency on 2026-04-24 has been approved. Note: Bring Valid ID', 1, '2026-04-22 07:09:00'),
-(12, 11, 'Appointment Approved', 'Your appointment for Barangay Certificate of Residency on 2026-04-24 has been approved. Note: Bring Valid ID', 1, '2026-04-22 07:09:10'),
-(13, 11, 'Appointment Approved', 'Your appointment for Barangay Certificate of Residency on 2026-04-24 has been approved. Note: Bring Valid ID', 1, '2026-04-22 07:09:38'),
-(14, 11, 'Appointment Approved', 'Your appointment for Barangay Certificate of Residency on 2026-04-24 has been approved. Note: Bring Valid ID', 1, '2026-04-22 07:11:47'),
 (15, 16, 'Appointment Removed', 'Your appointment #10 has been removed by admin.', 0, '2026-04-22 15:27:29'),
-(16, 15, 'Appointment Approved', 'Your appointment for Certificate of Good Moral Character on 2026-04-22 has been approved. Note: sorry', 0, '2026-04-22 15:28:35');
+(16, 15, 'Appointment Approved', 'Your appointment for Certificate of Good Moral Character on 2026-04-22 has been approved. Note: sorry', 0, '2026-04-22 15:28:35'),
+(18, 6, 'New Appointment Request', 'Marlon Villarin has requested Barangay Business Clearance on 2026-04-25.', 1, '2026-04-24 00:08:29'),
+(20, 18, 'Welcome to Barangay AMS!', 'Your account has been verified.', 1, '2026-05-12 15:06:13'),
+(21, 18, 'Appointment Submitted', 'Your appointment for Barangay Business Clearance on 2026-05-16 at 08:00 AM is now pending review.', 0, '2026-05-15 12:50:28'),
+(22, 6, 'New Appointment Request', 'Marlon Villarin has requested Barangay Business Clearance on 2026-05-16.', 1, '2026-05-15 12:50:28'),
+(23, 18, 'Appointment Approved', 'Your appointment for Barangay Business Clearance on 2026-05-16 has been approved. Note: pagdaala ug kwarta', 0, '2026-05-16 02:05:13');
 
 -- --------------------------------------------------------
 
@@ -117,10 +117,10 @@ CREATE TABLE `users` (
 INSERT INTO `users` (`id`, `name`, `email`, `password`, `phone`, `address`, `role`, `is_verified`, `verify_code`, `verify_expires`, `created_at`) VALUES
 (6, 'Admin', 'admin@brgy.gov.ph', '$2y$10$x2anpNmEhGCAhInR0ifFp.O3r/64dcuIY8iU76DkXbrUYfEieZ6ky', '09123456789', 'Canada', 'admin', 1, NULL, NULL, '2026-04-21 02:42:27'),
 (7, 'Juan Dela Cruz', 'juan@gmail.com', '$2y$10$z.hxeVLU6zgLqS4OQOUOMuABU1ANbw9se2E87ztTg1/blhmMfv6sy', '', '', '', 1, NULL, NULL, '2026-04-21 02:42:27'),
-(11, 'Marlon Villarin', 'marlonvillarin69@gmail.com', '$2y$10$RRzM71lpyK82LWM.xqwAqe9HJFFtm/PHXdb9WxDvvB.krc3xIfI/O', '09283464210', 'Lapu Lapu City Cebu', 'resident', 1, NULL, NULL, '2026-04-22 06:02:51'),
 (14, 'Marlota Villarin', 'marlonvillarin70@gmail.com', '$2y$10$RL8luuVNF2FNYCS/bRDiw.zuxi2awUq1afce0JJ8VC4kjHqenpgSq', '09132456879', 'Busay', 'resident', 0, '188340', '2026-04-22 08:24:28', '2026-04-22 06:07:33'),
 (15, 'Jonnel Villarin', 'walkin_1776862267@local', '', '09123456789', 'Walk-in', 'resident', 1, NULL, NULL, '2026-04-22 12:51:07'),
-(16, 'Walk-in User', 'walkin@system.local', '', '', '', '', 1, NULL, NULL, '2026-04-22 12:54:20');
+(16, 'Walk-in User', 'walkin@system.local', '', '', '', '', 1, NULL, NULL, '2026-04-22 12:54:20'),
+(18, 'Marlon Villarin', 'marlonvillarin69@gmail.com', '$2y$10$jOnOFL6zy127QQmffvVlIuT6A5oKDAdb7QOU0U70KIQh27cRZN7SK', '09283464210', 'Busay', 'resident', 1, NULL, NULL, '2026-05-12 15:05:39');
 
 --
 -- Indexes for dumped tables
@@ -155,19 +155,19 @@ ALTER TABLE `users`
 -- AUTO_INCREMENT for table `appointments`
 --
 ALTER TABLE `appointments`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=14;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=17;
 
 --
 -- AUTO_INCREMENT for table `notifications`
 --
 ALTER TABLE `notifications`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=17;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=24;
 
 --
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=18;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=19;
 
 --
 -- Constraints for dumped tables

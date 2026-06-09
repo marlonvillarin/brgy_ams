@@ -1,6 +1,6 @@
 <?php
 require_once 'includes/db.php';
-require_once 'includes/auth.php'; // ✅ THIS IS MISSING IN YOUR CASE
+require_once 'includes/auth.php';
 include 'includes/header.php'; ?>
 
 <div class="logout-overlay">

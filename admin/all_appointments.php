@@ -5,232 +5,409 @@ require_once '../includes/auth.php';
 require_once '../includes/mailer.php';
 requireAdmin();
 
-$time_slots = ["08:00 AM", "09:00 AM", "10:00 AM", "11:00 AM", "01:00 PM", "02:00 PM", "03:00 PM", "04:00 PM"];
+$page_title = "All Appointments — Admin | Barangay AMS";
 
-// ── Handle POST actions ───────────────────────────────────────────
+// Handle POST actions (delete, restore, etc.)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_type'])) {
     $appt_id = (int) ($_POST['appt_id'] ?? 0);
-    $action = trim($_POST['action_type'] ?? '');
-    $admin_note = clean($conn, $_POST['admin_note'] ?? '');
+    $action = $_POST['action_type'];
 
-    $fa = $conn->query("SELECT a.*,u.name un,u.email ue FROM appointments a JOIN users u ON a.user_id=u.id WHERE a.id=$appt_id");
-    $appt = $fa->fetch_assoc();
-
-    if ($action === 'hard_delete') {
-        $conn->query("DELETE FROM appointments WHERE id=$appt_id");
-        setFlash('success', 'Appointment permanently deleted.');
-
-    } elseif ($action === 'soft_delete') {
-        $conn->query("UPDATE appointments SET deleted_at=NOW() WHERE id=$appt_id");
-        if ($appt)
-            notify($conn, $appt['user_id'], 'Appointment Removed', 'Your appointment #' . $appt_id . ' has been removed by admin.');
-        setFlash('warning', 'Appointment marked as deleted (crossed out).');
-
+    if ($action === 'soft_delete') {
+        $conn->query("UPDATE appointments SET deleted_at = NOW() WHERE id = $appt_id");
+        setFlash('warning', 'Appointment moved to trash.');
     } elseif ($action === 'restore') {
-        $conn->query("UPDATE appointments SET deleted_at=NULL WHERE id=$appt_id");
+        $conn->query("UPDATE appointments SET deleted_at = NULL WHERE id = $appt_id");
         setFlash('success', 'Appointment restored.');
-
-    } elseif (in_array($action, ['approved', 'rejected', 'pending', 'rescheduled'])) {
-        if ($action === 'rescheduled') {
-            $nd = clean($conn, $_POST['new_date'] ?? '');
-            $nt = clean($conn, $_POST['new_time'] ?? '');
-            $conn->query("UPDATE appointments SET status='rescheduled',admin_note='$admin_note',appt_date='$nd',appt_time='$nt' WHERE id=$appt_id");
-        } else {
-            $conn->query("UPDATE appointments SET status='$action',admin_note='$admin_note' WHERE id=$appt_id");
-        }
-        if ($appt) {
-            $label = ['approved' => 'Approved', 'rejected' => 'Rejected', 'rescheduled' => 'Rescheduled', 'pending' => 'Reset to Pending'][$action];
-            notify($conn, $appt['user_id'], "Appointment {$label}", "Your appointment for {$appt['document_type']} on {$appt['appt_date']} has been {$action}." . ($admin_note ? " Note: $admin_note" : ''));
-            sendStatusEmail($appt['ue'], $appt['un'], $action, $appt['document_type'], $appt['appt_date'], $admin_note);
-        }
-        setFlash('success', "Appointment {$action} successfully.");
+    } elseif ($action === 'hard_delete') {
+        $conn->query("DELETE FROM appointments WHERE id = $appt_id");
+        setFlash('success', 'Appointment permanently deleted.');
     }
-
-    header("Location: index.php");
+    header("Location: all_appointments.php");
     exit();
 }
 
-// ── Stats (still needed for the stat cards) ───────────────────────
-$sq = $conn->query("SELECT status, COUNT(*) c FROM appointments WHERE deleted_at IS NULL GROUP BY status");
-$stats = ['pending' => 0, 'approved' => 0, 'rejected' => 0, 'rescheduled' => 0, 'total' => 0];
-while ($r = $sq->fetch_assoc()) {
-    $stats[$r['status']] = (int) $r['c'];
-    $stats['total'] += $r['c'];
-}
-$deleted_count = $conn->query("SELECT COUNT(*) c FROM appointments WHERE deleted_at IS NOT NULL")->fetch_assoc()['c'];
-$show_deleted = isset($_GET['show_deleted']);
+// Get distinct document types for filter dropdown
+$docTypes = $conn->query("SELECT DISTINCT document_type FROM appointments ORDER BY document_type")->fetch_all(MYSQLI_ASSOC);
 
-ob_start(); ?>
+ob_start();
+?>
+
+<!-- DataTables CSS -->
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.1/css/buttons.dataTables.min.css">
+
+<!-- DataTables JS -->
+<script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.1/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.html5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.print.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+<style>
+    /* Filter Row Styling */
+    .filter-row {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        display: flex;
+        gap: 15px;
+        flex-wrap: wrap;
+        align-items: flex-end;
+    }
+
+    .filter-group {
+        flex: 1;
+        min-width: 150px;
+    }
+
+    .filter-group label {
+        display: block;
+        font-size: 12px;
+        font-weight: 600;
+        margin-bottom: 5px;
+        color: #495057;
+    }
+
+    .filter-group select,
+    .filter-group input {
+        width: 100%;
+        padding: 8px 12px;
+        border: 1px solid #ced4da;
+        border-radius: 6px;
+        font-size: 14px;
+    }
+
+    .btn-reset {
+        background: #6c757d;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 6px;
+        cursor: pointer;
+    }
+
+    .btn-reset:hover {
+        background: #5a6268;
+    }
+
+    /* DataTable Custom Styling */
+    .dataTables_wrapper .dataTables_length {
+        float: left;
+        margin-bottom: 15px;
+    }
+
+    .dataTables_wrapper .dataTables_filter {
+        float: right;
+        margin-bottom: 15px;
+    }
+
+    .dataTables_wrapper .dataTables_info {
+        float: left;
+        padding-top: 15px;
+        font-size: 13px;
+        color: #6c757d;
+    }
+
+    .dataTables_wrapper .dataTables_paginate {
+        float: right;
+        padding-top: 15px;
+    }
+
+    .dataTables_wrapper .dataTables_paginate .paginate_button {
+        padding: 6px 12px;
+        margin: 0 2px;
+        border-radius: 4px;
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        color: #003087;
+        cursor: pointer;
+    }
+
+    .dataTables_wrapper .dataTables_paginate .paginate_button.current {
+        background: #003087;
+        color: white;
+        border-color: #003087;
+    }
+
+    .dataTables_wrapper .dt-buttons {
+        float: left;
+        margin-right: 15px;
+        margin-bottom: 15px;
+    }
+
+    .btn-excel {
+        background: #28a745;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: 600;
+    }
+
+    .btn-excel:hover {
+        background: #218838;
+    }
+
+    .btn-print {
+        background: #17a2b8;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: 600;
+    }
+
+    .btn-print:hover {
+        background: #138496;
+    }
+
+    /* Table Styling */
+    table.dataTable {
+        font-size: 13px;
+    }
+
+    table.dataTable thead th {
+        background: #003087;
+        color: white;
+        padding: 12px 10px;
+        font-weight: 600;
+    }
+
+    table.dataTable tbody td {
+        padding: 10px;
+        vertical-align: middle;
+    }
+
+    table.dataTable tbody tr:hover {
+        background: #f8f9fa;
+    }
+
+    /* Make sure DataTables controls are visible */
+    .dataTables_wrapper .dataTables_length {
+        float: left;
+        margin-bottom: 15px;
+        display: block !important;
+        visibility: visible !important;
+    }
+
+    .dataTables_wrapper .dataTables_length select {
+        display: inline-block !important;
+        width: auto;
+        padding: 5px 10px;
+        margin: 0 5px;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+    }
+</style>
+
 <script>
     $(document).ready(function () {
-        const table = $('#apptTable').DataTable({
+        const table = $('#appointmentsTable').DataTable({
             processing: true,
             serverSide: true,
             ajax: {
                 url: 'appointments_data.php',
                 type: 'POST',
                 data: function (d) {
-                    d.show_deleted = <?= $show_deleted ? 1 : 0 ?>;
+                    d.document_type = $('#filterDocument').val();
                     d.status = $('#filterStatus').val();
-                    d.date = $('#filterDate').val();
+                    d.date_from = $('#filterDateFrom').val();
+                    d.date_to = $('#filterDateTo').val();
+                    d.show_deleted = 0;
                 }
             },
             columns: [
-                { data: 'id' },
-                { data: 'resident' },
-                { data: 'contact' },
-                { data: 'address' },
-                { data: 'document' },
-                { data: 'purpose' },
-                { data: 'datetime' },
-                { data: 'status' },
-                { data: 'actions', orderable: false },
+                { data: 'resident', title: 'RESIDENT NAME' },
+                { data: 'email', title: 'EMAIL' },
+                { data: 'contact', title: 'CONTACT' },
+                { data: 'address', title: 'ADDRESS' },
+                { data: 'document', title: 'DOCUMENT TYPE' },
+                { data: 'purpose', title: 'PURPOSE' },
+                { data: 'datetime', title: 'DATE & TIME' },
+                { data: 'status', title: 'STATUS' },
+                { data: 'actions', title: 'ACTIONS', orderable: false, searchable: false }
             ],
-            pageLength: 15,
-            language: { search: "🔍 Search:", processing: '⏳ Loading...' },
+            order: [[0, 'asc']],
+            pageLength: 10,
+            lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
+            language: {
+                search: "🔍 Search:",
+                processing: '⏳ Loading appointments...',
+                lengthMenu: "Show _MENU_ entries",
+                info: "Showing _START_ to _END_ of _TOTAL_ appointments",
+                infoEmpty: "No appointments found",
+                infoFiltered: "(filtered from _MAX_ total appointments)",
+                paginate: {
+                    first: "First",
+                    last: "Last",
+                    next: "→",
+                    previous: "←"
+                },
+                zeroRecords: "No matching appointments found"
+            },
+            dom: 'lBfrtip',
+            buttons: [
+                {
+                    extend: 'excelHtml5',
+                    text: '📊 Export to Excel',
+                    className: 'btn-excel',
+                    title: 'Barangay_Appointments_Report',
+                    exportOptions: { columns: [0, 1, 2, 3, 4, 5, 6] }
+                },
+                {
+                    extend: 'print',
+                    text: '🖨️ Print Report',
+                    className: 'btn-print',
+                    title: 'Barangay Appointments Report',
+                    exportOptions: { columns: [0, 1, 2, 3, 4, 5, 6] }
+                }
+            ]
         });
 
-        // Custom filter controls
-        $('#filterStatus, #filterDate').on('change', function () {
+        // Apply filters when changed
+        $('#filterDocument, #filterStatus, #filterDateFrom, #filterDateTo').on('change', function () {
             table.ajax.reload();
         });
-        $('#filterSearchBtn').on('click', function () {
-            table.search($('#filterQ').val()).draw();
-        });
-        $('#filterResetBtn').on('click', function () {
-            $('#filterQ, #filterDate').val('');
-            $('#filterStatus').val('all');
-            table.search('').ajax.reload();
+
+        // Reset all filters
+        $('#resetFilters').on('click', function () {
+            $('#filterDocument').val('');
+            $('#filterStatus').val('');
+            $('#filterDateFrom').val('');
+            $('#filterDateTo').val('');
+            table.ajax.reload();
         });
     });
 
-    // ── Modals ────────────────────────────────────────────────────────
     function openView(a) {
+        const isWalkin = !a.user_id;
+        const name = isWalkin ? (a.walkin_name || '-') : (a.u_name || '-');
+        const email = isWalkin ? 'Walk-in Client' : (a.u_email || '-');
+        const phone = isWalkin ? (a.walkin_phone || '-') : (a.u_phone || '-');
+        const address = isWalkin ? (a.walkin_address || '-') : (a.u_address || '-');
+
         document.getElementById('viewBody').innerHTML = `
-  <table style="width:100%;font-size:13px;border-collapse:collapse;">
-    <tr>
-      <td style="padding:7px 10px;color:#6c757d;width:140px;">Resident</td>
-      <td style="padding:7px 10px;font-weight:600;">${a.u_name ?? a.walkin_name ?? '-'}</td>
-    </tr>
-    <tr style="background:#f8f9fa">
-      <td style="padding:7px 10px;color:#6c757d;">Email</td>
-      <td style="padding:7px 10px;">${a.u_email ?? '-'}</td>
-    </tr>
-    <tr>
-      <td style="padding:7px 10px;color:#6c757d;">Phone</td>
-      <td style="padding:7px 10px;">${a.u_phone ?? a.walkin_phone ?? '-'}</td>
-    </tr>
-    <tr style="background:#f8f9fa">
-      <td style="padding:7px 10px;color:#6c757d;">Document</td>
-      <td style="padding:7px 10px;font-weight:600;">${a.document_type ?? '-'}</td>
-    </tr>
-    <tr>
-      <td style="padding:7px 10px;color:#6c757d;">Purpose</td>
-      <td style="padding:7px 10px;">${a.purpose ?? '-'}</td>
-    </tr>
-    <tr style="background:#f8f9fa">
-      <td style="padding:7px 10px;color:#6c757d;">Date</td>
-      <td style="padding:7px 10px;">${a.appt_date ?? '-'}</td>
-    </tr>
-    <tr>
-      <td style="padding:7px 10px;color:#6c757d;">Time</td>
-      <td style="padding:7px 10px;">${a.appt_time ?? '-'}</td>
-    </tr>
-    <tr style="background:#f8f9fa">
-      <td style="padding:7px 10px;color:#6c757d;">Status</td>
-      <td style="padding:7px 10px;">${a.status ? a.status.toUpperCase() : '-'}</td>
-    </tr>
-    ${a.notes ? `<tr><td style="padding:7px 10px;color:#6c757d;">Notes</td><td style="padding:7px 10px;">${a.notes}</td></tr>` : ''}
-    ${a.admin_note ? `<tr style="background:#f8f9fa"><td style="padding:7px 10px;color:#6c757d;">Admin Note</td><td style="padding:7px 10px;color:#dc3545;">${a.admin_note}</td></tr>` : ''}
-    <tr>
-      <td style="padding:7px 10px;color:#6c757d;">Submitted</td>
-      <td style="padding:7px 10px;">${a.created_at ?? '-'}</td>
-    </tr>
-  </table>
-  ${a.status === 'approved' ? `<a href="../print.php?id=${a.id}" target="_blank" class="btn btn-success" style="margin-top:14px;width:100%;">🖨️ Print Document</a>` : ''}`;
+    <table style="width:100%;font-size:13px;border-collapse:collapse;">
+        ${isWalkin ? '<tr style="background:#fff3cd;"><td style="padding:7px 10px;color:#856404;width:140px;">Type<td style="padding:7px 10px;font-weight:600;">🚶 Walk-in Client</td></tr>' : ''}
+        <tr><td style="padding:7px 10px;color:#6c757d;">Resident<td style="padding:7px 10px;font-weight:600;${isWalkin ? 'color:#dc3545;' : 'color:#003087;'}">${escapeHtml(name)}</td></tr>
+        <tr style="background:#f8f9fa"><td style="padding:7px 10px;color:#6c757d;">Email<td style="padding:7px 10px;">${escapeHtml(email)}</td></tr>
+        <tr><td style="padding:7px 10px;color:#6c757d;">Phone<td style="padding:7px 10px;">${escapeHtml(phone)}</td></tr>
+        <tr style="background:#f8f9fa"><td style="padding:7px 10px;color:#6c757d;">Address<td style="padding:7px 10px;">${escapeHtml(address)}</td></tr>
+        <tr><td style="padding:7px 10px;color:#6c757d;">Document<td style="padding:7px 10px;font-weight:600;">${escapeHtml(a.document_type)}</td></tr>
+        <tr style="background:#f8f9fa"><td style="padding:7px 10px;color:#6c757d;">Purpose<td style="padding:7px 10px;">${escapeHtml(a.purpose)}</td></tr>
+        <tr><td style="padding:7px 10px;color:#6c757d;">Date<td style="padding:7px 10px;">${escapeHtml(a.appt_date)}</td></tr>
+        <tr style="background:#f8f9fa"><td style="padding:7px 10px;color:#6c757d;">Time<td style="padding:7px 10px;">${escapeHtml(a.appt_time)}</td></tr>
+        <tr><td style="padding:7px 10px;color:#6c757d;">Status<td style="padding:7px 10px;">${escapeHtml(a.status).toUpperCase()}</td></tr>
+        ${a.notes ? `<tr style="background:#f8f9fa"><td style="padding:7px 10px;color:#6c757d;">Notes<td style="padding:7px 10px;">${escapeHtml(a.notes)}</td></tr>` : ''}
+        ${a.admin_note ? `<tr><td style="padding:7px 10px;color:#6c757d;">Admin Note<td style="padding:7px 10px;color:#dc3545;">${escapeHtml(a.admin_note)}</td></tr>` : ''}
+    </table>
+    ${a.status === 'approved' ? `<a href="../print.php?id=${a.id}" target="_blank" class="btn btn-success" style="margin-top:14px;width:100%;">🖨️ Print Document</a>` : ''}`;
         document.getElementById('viewModal').classList.add('show');
     }
 
     function openManage(a) {
         document.getElementById('manage_id').value = a.id;
         document.getElementById('del_id').value = a.id;
-        document.getElementById('manageInfo').innerHTML =
-            `<strong>${a.u_name ?? a.walkin_name ?? '-'}</strong> &mdash; 📞 ${a.u_phone ?? a.walkin_phone ?? '-'}<br>
-     📄 ${a.document_type ?? '-'}<br>
-     📅 ${a.appt_date ?? '-'} ⏰ ${a.appt_time ?? '-'}<br>
-     🎯 ${a.purpose ?? '-'}`;
+        const isWalkin = !a.user_id;
+        const name = isWalkin ? (a.walkin_name || '-') : (a.u_name || '-');
+        const phone = isWalkin ? (a.walkin_phone || '-') : (a.u_phone || '-');
+
+        document.getElementById('manageInfo').innerHTML = `
+        <strong style="color:${isWalkin ? '#dc3545' : '#003087'}">${escapeHtml(name)}</strong><br>
+        📞 ${escapeHtml(phone)}<br>
+        📄 ${escapeHtml(a.document_type)}<br>
+        📅 ${escapeHtml(a.appt_date)} ⏰ ${escapeHtml(a.appt_time)}<br>
+        🎯 ${escapeHtml(a.purpose)}`;
         document.getElementById('manageModal').classList.add('show');
     }
 
-    function toggleReschedule(v) {
-        document.getElementById('reschedFields').style.display = v === 'rescheduled' ? 'block' : 'none';
+    function toggleReschedule(value) {
+        document.getElementById('reschedFields').style.display = value === 'rescheduled' ? 'block' : 'none';
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str).replace(/[&<>]/g, function (m) {
+            if (m === '&') return '&amp;';
+            if (m === '<') return '&lt;';
+            if (m === '>') return '&gt;';
+            return m;
+        });
     }
 </script>
+
 <?php
 $extra_js = ob_get_clean();
-$page_title = "Appointments — Admin | Barangay AMS";
 require_once '../includes/header.php';
 ?>
 
 <?php showFlash(); ?>
 
-<!-- Page Header -->
 <div class="page-hdr">
     <div>
-        <div class="page-title">🏠 All Appointments</div>
-        <div class="page-sub">Review, approve, reject, or reschedule resident appointments.</div>
+        <div class="page-title">📋 All Appointments</div>
+        <div class="page-sub">Complete records - Filter by Document, Status, Date Range | Export to Excel | Print Report
+        </div>
     </div>
-    <a href="index.php<?= $show_deleted ? '' : '?show_deleted=1' ?>" class="btn btn-secondary btn-sm">
-        🗑️ <?= $show_deleted ? 'Hide' : 'Show' ?> Deleted (<?= $deleted_count ?>)
-    </a>
 </div>
 
-
-<div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:flex-end;">
-    <?php if ($show_deleted): ?>
-
-    <?php endif; ?>
-    <div style="flex:1;min-width:180px;">
-        <label class="flabel" style="font-size:12px;">Search</label>
-        <input type="text" id="filterQ" class="fc" placeholder="Name, document, date...">
-    </div>
-    <div style="min-width:150px;">
-        <label class="flabel" style="font-size:12px;">Status</label>
-        <select id="filterStatus" class="fc">
-            <option value="all">All Statuses</option>
-            <option value="pending">Pending</option>
-            <option value="approved">Approved</option>
-            <option value="rejected">Rejected</option>
-            <option value="rescheduled">Rescheduled</option>
+<!-- FILTER ROW -->
+<div class="filter-row">
+    <div class="filter-group">
+        <label>📄 Document Type</label>
+        <select id="filterDocument">
+            <option value="">All Documents</option>
+            <?php foreach ($docTypes as $doc): ?>
+                <option value="<?= e($doc['document_type']) ?>"><?= e($doc['document_type']) ?></option>
+            <?php endforeach; ?>
         </select>
     </div>
-    <div style="min-width:150px;">
-        <label class="flabel" style="font-size:12px;">Date</label>
-        <input type="date" id="filterDate" class="fc">
+    <div class="filter-group">
+        <label>📊 Status</label>
+        <select id="filterStatus">
+            <option value="">All Statuses</option>
+            <option value="pending">⏳ Pending</option>
+            <option value="approved">✅ Approved</option>
+            <option value="rejected">❌ Rejected</option>
+            <option value="rescheduled">📅 Rescheduled</option>
+        </select>
     </div>
-    <button id="filterSearchBtn" class="btn btn-primary">🔍 Search</button>
-    <button id="filterResetBtn" class="btn btn-secondary" type="button">Reset</button>
+    <div class="filter-group">
+        <label>📅 Date From</label>
+        <input type="date" id="filterDateFrom">
+    </div>
+    <div class="filter-group">
+        <label>📅 Date To</label>
+        <input type="date" id="filterDateTo">
+    </div>
+    <div class="filter-group">
+        <label>&nbsp;</label>
+        <button id="resetFilters" class="btn-reset">⟳ Reset</button>
+    </div>
 </div>
 
-<!-- Table -->
+<!-- TABLE -->
 <div class="card">
     <div class="tbl-wrap">
-        <table id="apptTable" class="gtbl dtbl" data-server-side="true" style="width:100%">
+        <table id="appointmentsTable" class="display" style="width:100%">
             <thead>
                 <tr>
-                    <th>#</th>
-                    <th>Resident</th>
-                    <th>Contact</th>
-                    <th>Address</th>
-                    <th>Document</th>
-                    <th>Purpose</th>
-                    <th>Date & Time</th>
-                    <th>Status</th>
-                    <th>Actions</th>
+                    <th>RESIDENT NAME</th>
+                    <th>EMAIL</th>
+                    <th>CONTACT</th>
+                    <th>ADDRESS</th>
+                    <th>DOCUMENT TYPE</th>
+                    <th>PURPOSE</th>
+                    <th>DATE & TIME</th>
+                    <th>STATUS</th>
+                    <th>ACTIONS</th>
                 </tr>
             </thead>
             <tbody>
-
+                <!-- DataTables fills this automatically -->
             </tbody>
         </table>
     </div>
@@ -258,20 +435,20 @@ require_once '../includes/header.php';
         </div>
         <div class="modal-body">
             <div id="manageInfo"
-                style="background:#f8f9fa;border-left:3px solid #003087;padding:14px;border-radius:0 6px 6px 0;font-size:13px;margin-bottom:18px;line-height:1.8;">
+                style="background:#f8f9fa;border-left:3px solid #003087;padding:14px;border-radius:6px;font-size:13px;margin-bottom:18px;">
             </div>
-            <form method="POST" id="manageForm">
+            <form method="POST">
                 <input type="hidden" name="appt_id" id="manage_id">
                 <div class="fg">
                     <label class="flabel">Action</label>
-                    <select name="action_type" id="manage_action" class="fc" onchange="toggleReschedule(this.value)">
+                    <select name="action_type" class="fc" id="manage_action" onchange="toggleReschedule(this.value)">
                         <option value="approved">✅ Approve</option>
                         <option value="rejected">❌ Reject</option>
                         <option value="rescheduled">📅 Reschedule</option>
                         <option value="pending">⏳ Reset to Pending</option>
                     </select>
                 </div>
-                <div id="reschedFields" style="display:none;">
+                <div id="reschedFields" style="display:none; margin-top:10px;">
                     <div class="frow">
                         <div class="fg">
                             <label class="flabel">New Date</label>
@@ -280,7 +457,7 @@ require_once '../includes/header.php';
                         <div class="fg">
                             <label class="flabel">New Time</label>
                             <select name="new_time" class="fc">
-                                <?php foreach ($time_slots as $t): ?>
+                                <?php foreach (["08:00 AM", "09:00 AM", "10:00 AM", "11:00 AM", "01:00 PM", "02:00 PM", "03:00 PM", "04:00 PM"] as $t): ?>
                                     <option><?= $t ?></option>
                                 <?php endforeach; ?>
                             </select>
@@ -289,21 +466,15 @@ require_once '../includes/header.php';
                 </div>
                 <div class="fg">
                     <label class="flabel">Admin Note (Optional)</label>
-                    <input type="text" name="admin_note" class="fc"
-                        placeholder="e.g. Bring valid ID, incomplete requirements...">
+                    <input type="text" name="admin_note" class="fc" placeholder="e.g., Bring valid ID">
                 </div>
-                <div style="display:flex;gap:8px;">
-                    <button type="submit" class="btn btn-success" style="flex:1;">✅ Confirm</button>
-                    <button type="button" onclick="document.getElementById('manageModal').classList.remove('show')"
-                        class="btn btn-secondary" style="flex:1;">Cancel</button>
-                </div>
+                <button type="submit" class="btn btn-success" style="width:100%;margin-top:10px;">✅ Confirm</button>
             </form>
-            <hr style="border:none;border-top:1px solid #e9ecef;margin:16px 0;">
-            <form method="POST"
-                onsubmit="return confirm('Mark as deleted? It will show crossed out but remain in records.')">
-                <input type="hidden" name="action_type" value="soft_delete">
+            <hr style="margin:16px 0;">
+            <form method="POST" onsubmit="return confirm('Move this appointment to trash?')">
                 <input type="hidden" name="appt_id" id="del_id">
-                <button type="submit" class="btn btn-danger" style="width:100%;">🗑️ Delete</button>
+                <input type="hidden" name="action_type" value="soft_delete">
+                <button type="submit" class="btn btn-danger" style="width:100%;">🗑️ Move to Trash</button>
             </form>
         </div>
     </div>

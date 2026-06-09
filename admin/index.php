@@ -61,6 +61,63 @@ $deleted_count = $conn->query("SELECT COUNT(*) c FROM appointments WHERE deleted
 $show_deleted = isset($_GET['show_deleted']);
 
 ob_start(); ?>
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css">
+
+<style>
+  /* DataTable Custom Styling */
+  .dataTables_wrapper .dataTables_length {
+    float: left;
+    margin-bottom: 15px;
+  }
+
+  .dataTables_wrapper .dataTables_filter {
+    float: right;
+    margin-bottom: 15px;
+  }
+
+  .dataTables_wrapper .dataTables_info {
+    float: left;
+    padding-top: 15px;
+    font-size: 13px;
+    color: #6c757d;
+  }
+
+  .dataTables_wrapper .dataTables_paginate {
+    float: right;
+    padding-top: 15px;
+  }
+
+  .dataTables_wrapper .dataTables_paginate .paginate_button {
+    padding: 6px 12px;
+    margin: 0 2px;
+    border-radius: 4px;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    color: #003087;
+    cursor: pointer;
+  }
+
+  .dataTables_wrapper .dataTables_paginate .paginate_button.current {
+    background: #003087;
+    color: white;
+    border-color: #003087;
+  }
+
+  table.dataTable thead th {
+    background: #003087;
+    color: white;
+    padding: 12px 10px;
+    font-weight: 600;
+  }
+
+  table.dataTable tbody td {
+    padding: 10px;
+    vertical-align: middle;
+  }
+</style>
+
+<script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+
 <script>
   $(document).ready(function () {
     const table = $('#apptTable').DataTable({
@@ -76,27 +133,46 @@ ob_start(); ?>
         }
       },
       columns: [
-        { data: 'id' },
-        { data: 'resident' },
-        { data: 'contact' },
-        { data: 'address' },
-        { data: 'document' },
-        { data: 'purpose' },
-        { data: 'datetime' },
-        { data: 'status' },
-        { data: 'actions', orderable: false },
+        { data: 'resident', title: 'RESIDENT NAME' },
+        { data: 'email', title: 'EMAIL' },
+        { data: 'contact', title: 'CONTACT' },
+        { data: 'address', title: 'ADDRESS' },
+        { data: 'document', title: 'DOCUMENT TYPE' },
+        { data: 'purpose', title: 'PURPOSE' },
+        { data: 'datetime', title: 'DATE & TIME' },
+        { data: 'status', title: 'STATUS' },
+        { data: 'actions', title: 'ACTIONS', orderable: false, searchable: false }
       ],
-      pageLength: 15,
-      language: { search: "🔍 Search:", processing: '⏳ Loading...' },
+      order: [[0, 'asc']],
+      pageLength: 10,
+      lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
+      language: {
+        search: "🔍 Search:",
+        processing: '⏳ Loading appointments...',
+        lengthMenu: "Show _MENU_ entries",
+        info: "Showing _START_ to _END_ of _TOTAL_ appointments",
+        infoEmpty: "No appointments found",
+        infoFiltered: "(filtered from _MAX_ total appointments)",
+        paginate: {
+          first: "First",
+          last: "Last",
+          next: "→",
+          previous: "←"
+        },
+        zeroRecords: "No matching appointments found"
+      },
+      dom: 'lBfrtip'
     });
 
     // Custom filter controls
     $('#filterStatus, #filterDate').on('change', function () {
       table.ajax.reload();
     });
+
     $('#filterSearchBtn').on('click', function () {
       table.search($('#filterQ').val()).draw();
     });
+
     $('#filterResetBtn').on('click', function () {
       $('#filterQ, #filterDate').val('');
       $('#filterStatus').val('all');
@@ -106,64 +182,60 @@ ob_start(); ?>
 
   // ── Modals ────────────────────────────────────────────────────────
   function openView(a) {
+    const isWalkin = !a.user_id;
+    const name = isWalkin ? (a.walkin_name || '-') : (a.u_name || '-');
+    const email = isWalkin ? 'Walk-in Client' : (a.u_email || '-');
+    const phone = isWalkin ? (a.walkin_phone || '-') : (a.u_phone || '-');
+    const address = isWalkin ? (a.walkin_address || '-') : (a.u_address || '-');
+
     document.getElementById('viewBody').innerHTML = `
-  <table style="width:100%;font-size:13px;border-collapse:collapse;">
-    <tr>
-      <td style="padding:7px 10px;color:#6c757d;width:140px;">Resident</td>
-      <td style="padding:7px 10px;font-weight:600;">${a.u_name ?? a.walkin_name ?? '-'}</td>
-    </tr>
-    <tr style="background:#f8f9fa">
-      <td style="padding:7px 10px;color:#6c757d;">Email</td>
-      <td style="padding:7px 10px;">${a.u_email ?? '-'}</td>
-    </tr>
-    <tr>
-      <td style="padding:7px 10px;color:#6c757d;">Phone</td>
-      <td style="padding:7px 10px;">${a.u_phone ?? a.walkin_phone ?? '-'}</td>
-    </tr>
-    <tr style="background:#f8f9fa">
-      <td style="padding:7px 10px;color:#6c757d;">Document</td>
-      <td style="padding:7px 10px;font-weight:600;">${a.document_type ?? '-'}</td>
-    </tr>
-    <tr>
-      <td style="padding:7px 10px;color:#6c757d;">Purpose</td>
-      <td style="padding:7px 10px;">${a.purpose ?? '-'}</td>
-    </tr>
-    <tr style="background:#f8f9fa">
-      <td style="padding:7px 10px;color:#6c757d;">Date</td>
-      <td style="padding:7px 10px;">${a.appt_date ?? '-'}</td>
-    </tr>
-    <tr>
-      <td style="padding:7px 10px;color:#6c757d;">Time</td>
-      <td style="padding:7px 10px;">${a.appt_time ?? '-'}</td>
-    </tr>
-    <tr style="background:#f8f9fa">
-      <td style="padding:7px 10px;color:#6c757d;">Status</td>
-      <td style="padding:7px 10px;">${a.status ? a.status.toUpperCase() : '-'}</td>
-    </tr>
-    ${a.notes ? `<tr><td style="padding:7px 10px;color:#6c757d;">Notes</td><td style="padding:7px 10px;">${a.notes}</td></tr>` : ''}
-    ${a.admin_note ? `<tr style="background:#f8f9fa"><td style="padding:7px 10px;color:#6c757d;">Admin Note</td><td style="padding:7px 10px;color:#dc3545;">${a.admin_note}</td></tr>` : ''}
-    <tr>
-      <td style="padding:7px 10px;color:#6c757d;">Submitted</td>
-      <td style="padding:7px 10px;">${a.created_at ?? '-'}</td>
-    </tr>
-  </table>
-  ${a.status === 'approved' ? `<a href="../print.php?id=${a.id}" target="_blank" class="btn btn-success" style="margin-top:14px;width:100%;">🖨️ Print Document</a>` : ''}`;
+    <table style="width:100%;font-size:13px;border-collapse:collapse;">
+        ${isWalkin ? '<tr style="background:#fff3cd;"><td style="padding:7px 10px;color:#856404;width:140px;">Type<td style="padding:7px 10px;font-weight:600;">🚶 Walk-in Client</td></tr>' : ''}
+        <tr><td style="padding:7px 10px;color:#6c757d;">Resident<td style="padding:7px 10px;font-weight:600;${isWalkin ? 'color:#dc3545;' : 'color:#003087;'}">${escapeHtml(name)}</td></tr>
+        <tr style="background:#f8f9fa"><td style="padding:7px 10px;color:#6c757d;">Email<td style="padding:7px 10px;">${escapeHtml(email)}</td></tr>
+        <tr><td style="padding:7px 10px;color:#6c757d;">Phone<td style="padding:7px 10px;">${escapeHtml(phone)}</td></tr>
+        <tr style="background:#f8f9fa"><td style="padding:7px 10px;color:#6c757d;">Address<td style="padding:7px 10px;">${escapeHtml(address)}</td></tr>
+        <tr><td style="padding:7px 10px;color:#6c757d;">Document<td style="padding:7px 10px;font-weight:600;">${escapeHtml(a.document_type)}</td></tr>
+        <tr style="background:#f8f9fa"><td style="padding:7px 10px;color:#6c757d;">Purpose<td style="padding:7px 10px;">${escapeHtml(a.purpose)}</td></tr>
+        <tr><td style="padding:7px 10px;color:#6c757d;">Date<td style="padding:7px 10px;">${escapeHtml(a.appt_date)}</td></tr>
+        <tr style="background:#f8f9fa"><td style="padding:7px 10px;color:#6c757d;">Time<td style="padding:7px 10px;">${escapeHtml(a.appt_time)}</td></tr>
+        <tr><td style="padding:7px 10px;color:#6c757d;">Status<td style="padding:7px 10px;">${escapeHtml(a.status).toUpperCase()}</td></tr>
+        ${a.notes ? `<tr style="background:#f8f9fa"><td style="padding:7px 10px;color:#6c757d;">Notes<td style="padding:7px 10px;">${escapeHtml(a.notes)}</td></tr>` : ''}
+        ${a.admin_note ? `<tr><td style="padding:7px 10px;color:#6c757d;">Admin Note<td style="padding:7px 10px;color:#dc3545;">${escapeHtml(a.admin_note)}</td></tr>` : ''}
+        <tr style="background:#f8f9fa"><td style="padding:7px 10px;color:#6c757d;">Submitted<td style="padding:7px 10px;">${escapeHtml(a.created_at)}</td></tr>
+    </table>
+    ${a.status === 'approved' ? `<a href="../print.php?id=${a.id}" target="_blank" class="btn btn-success" style="margin-top:14px;width:100%;">🖨️ Print Document</a>` : ''}`;
     document.getElementById('viewModal').classList.add('show');
   }
 
   function openManage(a) {
     document.getElementById('manage_id').value = a.id;
     document.getElementById('del_id').value = a.id;
-    document.getElementById('manageInfo').innerHTML =
-      `<strong>${a.u_name ?? a.walkin_name ?? '-'}</strong> &mdash; 📞 ${a.u_phone ?? a.walkin_phone ?? '-'}<br>
-     📄 ${a.document_type ?? '-'}<br>
-     📅 ${a.appt_date ?? '-'} ⏰ ${a.appt_time ?? '-'}<br>
-     🎯 ${a.purpose ?? '-'}`;
+    const isWalkin = !a.user_id;
+    const name = isWalkin ? (a.walkin_name || '-') : (a.u_name || '-');
+    const phone = isWalkin ? (a.walkin_phone || '-') : (a.u_phone || '-');
+
+    document.getElementById('manageInfo').innerHTML = `
+        <strong style="color:${isWalkin ? '#dc3545' : '#003087'}">${escapeHtml(name)}</strong><br>
+        📞 ${escapeHtml(phone)}<br>
+        📄 ${escapeHtml(a.document_type)}<br>
+        📅 ${escapeHtml(a.appt_date)} ⏰ ${escapeHtml(a.appt_time)}<br>
+        🎯 ${escapeHtml(a.purpose)}`;
     document.getElementById('manageModal').classList.add('show');
   }
 
   function toggleReschedule(v) {
     document.getElementById('reschedFields').style.display = v === 'rescheduled' ? 'block' : 'none';
+  }
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/[&<>]/g, function (m) {
+      if (m === '&') return '&amp;';
+      if (m === '<') return '&lt;';
+      if (m === '>') return '&gt;';
+      return m;
+    });
   }
 </script>
 
@@ -178,7 +250,7 @@ require_once '../includes/header.php';
 <!-- Page Header -->
 <div class="page-hdr">
   <div>
-    <div class="page-title">🏠 Admin Dashboard</div>
+    <div class="page-title">Admin Dashboard</div>
     <div class="page-sub">Review, approve, reject, or reschedule resident appointments.</div>
   </div>
   <a href="index.php<?= $show_deleted ? '' : '?show_deleted=1' ?>" class="btn btn-secondary btn-sm">
@@ -204,11 +276,8 @@ require_once '../includes/header.php';
   <?php endforeach; ?>
 </div>
 
-
+<!-- Filter Row -->
 <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:flex-end;">
-  <?php if ($show_deleted): ?>
-
-  <?php endif; ?>
   <div style="flex:1;min-width:180px;">
     <label class="flabel" style="font-size:12px;">Search</label>
     <input type="text" id="filterQ" class="fc" placeholder="Name, document, date...">
@@ -234,22 +303,22 @@ require_once '../includes/header.php';
 <!-- Table -->
 <div class="card">
   <div class="tbl-wrap">
-    <table id="apptTable" class="gtbl dtbl" data-server-side="true" style="width:100%">
+    <table id="apptTable" class="display" style="width:100%">
       <thead>
         <tr>
-          <th>#</th>
-          <th>Resident</th>
-          <th>Contact</th>
-          <th>Address</th>
-          <th>Document</th>
-          <th>Purpose</th>
-          <th>Date & Time</th>
-          <th>Status</th>
-          <th>Actions</th>
+          <th>RESIDENT NAME</th>
+          <th>EMAIL</th>
+          <th>CONTACT</th>
+          <th>ADDRESS</th>
+          <th>DOCUMENT TYPE</th>
+          <th>PURPOSE</th>
+          <th>DATE & TIME</th>
+          <th>STATUS</th>
+          <th>ACTIONS</th>
         </tr>
       </thead>
       <tbody>
-
+        <!-- DataTables fills this automatically -->
       </tbody>
     </table>
   </div>
@@ -270,7 +339,7 @@ require_once '../includes/header.php';
 <div id="manageModal" class="modal-overlay">
   <div class="modal-box">
     <div class="modal-hdr">
-      <h3>⚙️ Manage Appointment</h3>
+      <h3>Manage Appointment</h3>
       <button class="modal-close" onclick="document.getElementById('manageModal').classList.remove('show')">×</button>
     </div>
     <div class="modal-body">
@@ -282,10 +351,10 @@ require_once '../includes/header.php';
         <div class="fg">
           <label class="flabel">Action</label>
           <select name="action_type" id="manage_action" class="fc" onchange="toggleReschedule(this.value)">
-            <option value="approved">✅ Approve</option>
-            <option value="rejected">❌ Reject</option>
-            <option value="rescheduled">📅 Reschedule</option>
-            <option value="pending">⏳ Reset to Pending</option>
+            <option value="approved">Approve</option>
+            <option value="rejected">Reject</option>
+            <option value="rescheduled">Reschedule</option>
+            <option value="pending">Reset to Pending</option>
           </select>
         </div>
         <div id="reschedFields" style="display:none;">
@@ -309,7 +378,7 @@ require_once '../includes/header.php';
           <input type="text" name="admin_note" class="fc" placeholder="e.g. Bring valid ID, incomplete requirements...">
         </div>
         <div style="display:flex;gap:8px;">
-          <button type="submit" class="btn btn-success" style="flex:1;">✅ Confirm</button>
+          <button type="submit" class="btn btn-success" style="flex:1;">Confirm</button>
           <button type="button" onclick="document.getElementById('manageModal').classList.remove('show')"
             class="btn btn-secondary" style="flex:1;">Cancel</button>
         </div>
@@ -318,7 +387,7 @@ require_once '../includes/header.php';
       <form method="POST" onsubmit="return confirm('Mark as deleted? It will show crossed out but remain in records.')">
         <input type="hidden" name="action_type" value="soft_delete">
         <input type="hidden" name="appt_id" id="del_id">
-        <button type="submit" class="btn btn-danger" style="width:100%;">🗑️ Delete</button>
+        <button type="submit" class="btn btn-danger" style="width:100%;">Delete</button>
       </form>
     </div>
   </div>

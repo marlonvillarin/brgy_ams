@@ -6,15 +6,18 @@ requireAdmin();
 
 header('Content-Type: application/json');
 
-$show_deleted = !empty($_POST['show_deleted']);
-$fstatus = clean($conn, $_POST['status'] ?? 'all');
-$fdate = clean($conn, $_POST['date'] ?? '');
-
 $draw = (int) ($_POST['draw'] ?? 1);
 $start = (int) ($_POST['start'] ?? 0);
 $length = (int) ($_POST['length'] ?? 15);
-$search = clean($conn, $_POST['search']['value'] ?? '');
+$search = isset($_POST['search']['value']) ? clean($conn, $_POST['search']['value']) : '';
 
+// Filter parameters with defaults
+$show_deleted = !empty($_POST['show_deleted']);
+$fstatus = isset($_POST['status']) && $_POST['status'] !== '' ? clean($conn, $_POST['status']) : 'all';
+$fdate = isset($_POST['date']) ? clean($conn, $_POST['date']) : '';
+$fdocument = isset($_POST['document_type']) ? clean($conn, $_POST['document_type']) : '';
+$fdate_from = isset($_POST['date_from']) ? clean($conn, $_POST['date_from']) : '';
+$fdate_to = isset($_POST['date_to']) ? clean($conn, $_POST['date_to']) : '';
 
 $cols = [
     0 => 'a.id',
@@ -38,6 +41,12 @@ if ($fstatus !== 'all')
 if ($fdate)
     $where .= " AND a.appt_date = '$fdate'";
 
+if ($fdocument)
+    $where .= " AND a.document_type = '$fdocument'";
+if ($fdate_from)
+    $where .= " AND a.appt_date >= '$fdate_from'";
+if ($fdate_to)
+    $where .= " AND a.appt_date <= '$fdate_to'";
 
 $searchClause = '';
 if ($search) {
@@ -118,27 +127,19 @@ foreach ($rows as $a) {
         <button class='btn btn-danger btn-sm'>🗑️ Purge</button>
       </form>";
     }
+    $email = !empty($a['u_email'])
+        ? htmlspecialchars($a['u_email'])
+        : 'Walk-in Client';
 
     $data[] = [
         'DT_RowClass' => $is_del ? 'soft-del' : '',
-        'id' => $id,
-        'resident' => "
-<strong style='color:#003087;'>" . htmlspecialchars($a['u_name'] ?? $a['walkin_name'] ?? '-') . "</strong><br>
-<small style='color:" . (!empty($a['u_email']) ? '#6c757d' : '#dc3545') . "; font-weight:500;'>
-" . (!empty($a['u_email'])
-            ? htmlspecialchars($a['u_email'])
-            : "Walk-in Applicant") . "
-</small>",
-        'contact' => "📱 " . htmlspecialchars($a['u_phone'] ?? $a['walkin_phone'] ?? '-'),
-
+        'resident' => "<strong style='color:#003087;'>" . htmlspecialchars($a['u_name'] ?? $a['walkin_name'] ?? '-') . "</strong>",
+        'email' => "<small style='color:" . (!empty($a['u_email']) ? '#6c757d' : '#dc3545') . ";'>" . $email . "</small>",
+        'contact' => htmlspecialchars($a['u_phone'] ?? $a['walkin_phone'] ?? '-'),
         'address' => htmlspecialchars($a['u_address'] ?? $a['walkin_address'] ?? '-'),
-
         'document' => htmlspecialchars($a['document_type'] ?? '-'),
-
         'purpose' => htmlspecialchars($a['purpose'] ?? '-'),
-
-        'datetime' => "📅 " . htmlspecialchars($a['appt_date'] ?? '-') . "<br>
-              ⏰ " . htmlspecialchars($a['appt_time'] ?? '-'),
+        'datetime' => htmlspecialchars($a['appt_date'] ?? '-') . "<br>" . htmlspecialchars($a['appt_time'] ?? '-'),
         'status' => $statusBadge,
         'actions' => $actions,
     ];

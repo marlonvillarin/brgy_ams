@@ -78,8 +78,8 @@ $unread = ($uid && isset($conn)) ? getUnread($conn, $uid) : 0;
         <a href="/brgy_ams/admin/residents.php" class="<?= $cur === 'residents.php' ? 'active' : '' ?>"><span
             class="icon">👥</span> Residents</a>
         <a href="/brgy_ams/admin/walkin.php" class="<?= $cur === 'walkin.php' ? 'active' : '' ?>">
-          <span class="icon">🚶</span> Walk-in
-        </a>
+          <span class="icon">🚶</span> Walk-in Appointment</a>
+
         <a href="/brgy_ams/admin/reports.php" class="<?= $cur === 'reports.php' ? 'active' : '' ?>"><span
             class="icon">📊</span>
           Reports</a>

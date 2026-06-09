@@ -2,6 +2,13 @@
 session_start();
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
+
+if (!isset($_SESSION['human_verified']) || $_SESSION['human_verified'] !== true) {
+  header("Location: gateway.php");
+  exit();
+}
+
+
 if (isLoggedIn()) {
   header("Location:" . (isAdmin() ? 'admin/index.php' : 'dashboard.php'));
   exit();
@@ -45,8 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </head>
 
 <body>
-  <!-- <div class="gov-bar"><span>🇵🇭</span><span>Republic of the Philippines &mdash; Official Barangay Services
-      Portal</span></div> -->
+
   <div class="auth-page">
     <div class="auth-logo">
       <div class="lc">🏛️</div>
